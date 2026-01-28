@@ -56,7 +56,7 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=auth_config["cookie_expiry_days"],
 )
 
-name, authentication_status, username = authenticator.login("登入系統", "main")
+name, authentication_status, username = authenticator.login("登入系統", location="sidebar")
 
 if authentication_status is False:
     st.error("帳號或密碼錯誤")
