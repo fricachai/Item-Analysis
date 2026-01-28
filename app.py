@@ -57,39 +57,7 @@ authenticator = stauth.Authenticate(
     auth_config["cookie_expiry_days"],
 )
 
-def compat_login(authenticator):
-    """
-    依序嘗試各版本 login() 可能的呼叫方式
-    成功就回傳 (name, authentication_status, username)
-    """
-    # 1) 新版：form_name + location=...
-    try:
-        return authenticator.login("登入系統", location="main")
-    except TypeError:
-        pass
-
-    # 2) 常見版：form_name + location(位置參數)
-    try:
-        return authenticator.login("登入系統", "main")
-    except TypeError:
-        pass
-
-    # 3) 另一支版本：location + form_name
-    try:
-        return authenticator.login("main", "登入系統")
-    except TypeError:
-        pass
-
-    # 4) 少數舊版：不帶參數（或只帶一個）
-    try:
-        return authenticator.login()
-    except TypeError:
-        pass
-
-    # 5) 最後再試：只帶標題
-    return authenticator.login("登入系統")
-
-name, authentication_status, username = compat_login(authenticator)
+name, authentication_status, username = authenticator.login("main", "登入系統")
 
 if authentication_status is False:
     st.error("帳號或密碼錯誤")
