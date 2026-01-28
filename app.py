@@ -46,13 +46,11 @@ def secrets_to_dict(x):
         return [secrets_to_dict(v) for v in x]
     return x
 
-import copy
-
-# ===== Authentication (Level B) =====
-auth_config = copy.deepcopy(dict(st.secrets["auth"]))  # ✅ 變成可寫的 dict
+# ===== Authentication Gate (Level B) =====
+auth_config = secrets_to_dict(st.secrets["auth"])  # ✅ 轉成可寫的純 dict（不要 deepcopy）
 
 authenticator = stauth.Authenticate(
-    credentials=auth_config["credentials"],            # ✅ 不要用 st.secrets 直接引用
+    credentials=auth_config["credentials"],
     cookie_name=auth_config["cookie_name"],
     cookie_key=auth_config["cookie_key"],
     cookie_expiry_days=auth_config["cookie_expiry_days"],
