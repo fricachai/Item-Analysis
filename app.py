@@ -33,6 +33,7 @@ except Exception:
 # ---- Page ----
 st.set_page_config(page_title="fricachai 論文統計分析專業版(release 1.0) 2026.01.28 ", layout="wide")
 
+
 import streamlit as st
 import streamlit_authenticator as stauth
 
@@ -45,8 +46,10 @@ def secrets_to_dict(x):
         return [secrets_to_dict(v) for v in x]
     return x
 
+# ===== Level B Auth Gate (兼容各版本 streamlit-authenticator) =====
 auth_config = secrets_to_dict(st.secrets["auth"])
 
+# ⚠️ Authenticate 的參數也有版本差異：這個寫法兼容性最高（用位置參數）
 authenticator = stauth.Authenticate(
     auth_config["credentials"],
     auth_config["cookie_name"],
@@ -54,8 +57,39 @@ authenticator = stauth.Authenticate(
     auth_config["cookie_expiry_days"],
 )
 
-# ✅ 這版：第一個參數是 location，第二個才是表單標題
-name, authentication_status, username = authenticator.login("main", "登入系統")
+def compat_login(authenticator):
+    """
+    依序嘗試各版本 login() 可能的呼叫方式
+    成功就回傳 (name, authentication_status, username)
+    """
+    # 1) 新版：form_name + location=...
+    try:
+        return authenticator.login("登入系統", location="main")
+    except TypeError:
+        pass
+
+    # 2) 常見版：form_name + location(位置參數)
+    try:
+        return authenticator.login("登入系統", "main")
+    except TypeError:
+        pass
+
+    # 3) 另一支版本：location + form_name
+    try:
+        return authenticator.login("main", "登入系統")
+    except TypeError:
+        pass
+
+    # 4) 少數舊版：不帶參數（或只帶一個）
+    try:
+        return authenticator.login()
+    except TypeError:
+        pass
+
+    # 5) 最後再試：只帶標題
+    return authenticator.login("登入系統")
+
+name, authentication_status, username = compat_login(authenticator)
 
 if authentication_status is False:
     st.error("帳號或密碼錯誤")
@@ -65,8 +99,17 @@ elif authentication_status is None:
     st.stop()
 
 with st.sidebar:
-    authenticator.logout("sidebar", "登出")
+    # logout 也可能有不同簽名，做同樣兼容
+    try:
+        authenticator.logout("登出", "sidebar")
+    except TypeError:
+        try:
+            authenticator.logout("sidebar", "登出")
+        except TypeError:
+            authenticator.logout("登出")
+
     st.caption(f"登入者：{name} ({username})")
+
 
 
 
