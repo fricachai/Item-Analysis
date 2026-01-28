@@ -781,10 +781,12 @@ def build_independent_ttest_table(
     - 兩組名稱取自 group_col 的兩個類別文字
     - 列：dv_cols（A/B/C...）
     - ✅ 所有數值：小數第 4 位
-    - ✅ P 值：同欄位加顯著星號
+    - ✅ 顯著星號：標在「t值」欄位（依 p 值判斷）
+    - ✅ P值欄位：只顯示數值，不加星號
     """
     d = df[[group_col] + dv_cols].copy()
 
+    # group 欄位清理
     d[group_col] = d[group_col].astype(str).str.strip()
     d = d.replace({group_col: {"": np.nan, "nan": np.nan, "None": np.nan}})
     d = d.dropna(subset=[group_col])
@@ -802,22 +804,24 @@ def build_independent_ttest_table(
 
         if len(x1) < 2 or len(x2) < 2:
             tval, pval = (np.nan, np.nan)
-            m1, m2 = (x1.mean() if len(x1) else np.nan, x2.mean() if len(x2) else np.nan)
+            m1 = float(x1.mean()) if len(x1) else np.nan
+            m2 = float(x2.mean()) if len(x2) else np.nan
         else:
-            # ✅ Student t-test（等變異）
+            # Student t-test（等變異）
             ttest = ttest_ind(x1, x2, equal_var=True, nan_policy="omit")
             tval, pval = float(ttest.statistic), float(ttest.pvalue)
             m1, m2 = float(x1.mean()), float(x2.mean())
 
-        p_star = _p_stars(pval) if np.isfinite(pval) else ""
+        # ✅ 星號依 p 判斷，但要加在 t 值上
+        t_star = _p_stars(pval) if np.isfinite(pval) else ""
 
         rows.append(
             {
                 "變項": v,
                 str(g1): f"{m1:.4f}" if np.isfinite(m1) else "",
                 str(g2): f"{m2:.4f}" if np.isfinite(m2) else "",
-                "t值": _format_no_leading_zero(tval, 4) if np.isfinite(tval) else "",
-                "P值": (_format_no_leading_zero(pval, 4) + p_star) if np.isfinite(pval) else "",
+                "t值": (_format_no_leading_zero(tval, 4) + t_star) if np.isfinite(tval) else "",
+                "P值": _format_no_leading_zero(pval, 4) if np.isfinite(pval) else "",
             }
         )
 
