@@ -34,89 +34,44 @@ except Exception:
 st.set_page_config(page_title="fricachai 論文統計分析專業版(release 1.0) 2026.01.28 ", layout="wide")
 
 
+import inspect
 import streamlit as st
-import streamlit_authenticator as stauth
 
-def secrets_to_dict(x):
-    if hasattr(x, "to_dict"):
-        return secrets_to_dict(x.to_dict())
-    if isinstance(x, dict):
-        return {k: secrets_to_dict(v) for k, v in x.items()}
-    if isinstance(x, (list, tuple)):
-        return [secrets_to_dict(v) for v in x]
-    return x
+# ===== Login：只呼叫一次，避免 duplicate form key =====
+def safe_login(authenticator):
+    fn = authenticator.login
+    sig = inspect.signature(fn)
+    params = sig.parameters
 
-# ===== Level B Auth Gate (兼容各版本 streamlit-authenticator) =====
-auth_config = secrets_to_dict(st.secrets["auth"])
+    # 只呼叫一次：依參數名稱決定用哪種呼叫
+    if "location" in params:
+        # 這類版本通常是 login(form_name, location=...)
+        return fn("登入系統", location="main")
 
-# ⚠️ Authenticate 的參數也有版本差異：這個寫法兼容性最高（用位置參數）
-authenticator = stauth.Authenticate(
-    auth_config["credentials"],
-    auth_config["cookie_name"],
-    auth_config["cookie_key"],
-    auth_config["cookie_expiry_days"],
-)
+    # 沒有 location 參數 → 用位置參數呼叫（你目前版本就是這類）
+    # 依你前面的錯誤訊息：「Location must be one of...」代表它吃到 location 這個值
+    # 所以它的簽名很可能是 login(location, form_name, ...)
+    return fn("main", "登入系統")
 
-_login_ret = authenticator.login("main", "登入系統")
+login_ret = safe_login(authenticator)
 
-# 兼容不同版本回傳格式：
-# - 有的回 (name, status, username)
-# - 有的回 (name, status)
-# - 有的只回 status 或 dict
+# 兼容回傳
 name, authentication_status, username = ("", None, "")
-
-if isinstance(_login_ret, tuple):
-    if len(_login_ret) == 3:
-        name, authentication_status, username = _login_ret
-    elif len(_login_ret) == 2:
-        name, authentication_status = _login_ret
-        username = ""
-    elif len(_login_ret) == 1:
-        authentication_status = _login_ret[0]
-elif isinstance(_login_ret, dict):
-    name = _login_ret.get("name", "") or ""
-    username = _login_ret.get("username", "") or ""
-    authentication_status = _login_ret.get("authentication_status", None)
-else:
-    authentication_status = _login_ret
-
-
-# ===== Login（用 st.session_state 當最終來源，避免版本差異） =====
-# 先嘗試把 login 畫面 render 出來（不管回傳格式）
-try:
-    login_ret = authenticator.login("main", "登入系統")  # 你目前這版看起來是 (location, form_name)
-except TypeError:
-    # 有些版本是 (form_name, location) 或 keyword
-    try:
-        login_ret = authenticator.login("登入系統", "main")
-    except TypeError:
-        try:
-            login_ret = authenticator.login("登入系統", location="main")
-        except TypeError:
-            login_ret = authenticator.login()
-
-# 先給預設值
-name, authentication_status, username = ("", None, "")
-
-# 兼容：login() 可能回 tuple/dict/None
 if isinstance(login_ret, tuple):
     if len(login_ret) == 3:
         name, authentication_status, username = login_ret
     elif len(login_ret) == 2:
         name, authentication_status = login_ret
-    elif len(login_ret) == 1:
-        authentication_status = login_ret[0]
 elif isinstance(login_ret, dict):
     name = login_ret.get("name", "") or ""
     username = login_ret.get("username", "") or ""
     authentication_status = login_ret.get("authentication_status", None)
 
-# ✅ 關鍵：以 session_state 的結果覆蓋（很多版本只寫這裡）
+# 以 session_state 為準（很多版本只寫這裡）
 authentication_status = st.session_state.get("authentication_status", authentication_status)
 name = st.session_state.get("name", name)
 username = st.session_state.get("username", username)
 
-# Gate
 if authentication_status is True:
     with st.sidebar:
         try:
@@ -130,6 +85,7 @@ elif authentication_status is False:
 else:
     st.warning("請先登入")
     st.stop()
+
 
 
 
