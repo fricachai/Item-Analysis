@@ -57,7 +57,29 @@ authenticator = stauth.Authenticate(
     auth_config["cookie_expiry_days"],
 )
 
-name, authentication_status, username = authenticator.login("main", "登入系統")
+_login_ret = authenticator.login("main", "登入系統")
+
+# 兼容不同版本回傳格式：
+# - 有的回 (name, status, username)
+# - 有的回 (name, status)
+# - 有的只回 status 或 dict
+name, authentication_status, username = ("", None, "")
+
+if isinstance(_login_ret, tuple):
+    if len(_login_ret) == 3:
+        name, authentication_status, username = _login_ret
+    elif len(_login_ret) == 2:
+        name, authentication_status = _login_ret
+        username = ""
+    elif len(_login_ret) == 1:
+        authentication_status = _login_ret[0]
+elif isinstance(_login_ret, dict):
+    name = _login_ret.get("name", "") or ""
+    username = _login_ret.get("username", "") or ""
+    authentication_status = _login_ret.get("authentication_status", None)
+else:
+    authentication_status = _login_ret
+
 
 if authentication_status is False:
     st.error("帳號或密碼錯誤")
