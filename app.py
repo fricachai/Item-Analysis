@@ -37,7 +37,6 @@ import streamlit as st
 import streamlit_authenticator as stauth
 
 def secrets_to_dict(x):
-    """把 st.secrets 的巢狀 Secrets 物件轉成純 Python dict/list/primitive"""
     if hasattr(x, "to_dict"):
         return secrets_to_dict(x.to_dict())
     if isinstance(x, dict):
@@ -46,8 +45,8 @@ def secrets_to_dict(x):
         return [secrets_to_dict(v) for v in x]
     return x
 
-# ===== Authentication Gate (Level B) =====
-auth_config = secrets_to_dict(st.secrets["auth"])  # ✅ 轉成可寫的純 dict（不要 deepcopy）
+# ===== Authentication Gate =====
+auth_config = secrets_to_dict(st.secrets["auth"])
 
 authenticator = stauth.Authenticate(
     credentials=auth_config["credentials"],
@@ -56,7 +55,8 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=auth_config["cookie_expiry_days"],
 )
 
-name, authentication_status, username = authenticator.login("登入系統", location="sidebar")
+# ✅ 舊版 authenticator：login 只能這樣呼叫
+name, authentication_status, username = authenticator.login("登入系統")
 
 if authentication_status is False:
     st.error("帳號或密碼錯誤")
@@ -65,10 +65,10 @@ elif authentication_status is None:
     st.warning("請先登入")
     st.stop()
 
-# ✅ 登入成功才會往下跑
 with st.sidebar:
-    authenticator.logout("登出", "sidebar")
+    authenticator.logout("登出")
     st.caption(f"登入者：{name} ({username})")
+
 
 
 
