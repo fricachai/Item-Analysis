@@ -34,43 +34,49 @@ except Exception:
 st.set_page_config(page_title="fricachai 論文統計分析專業版(release 1.0) 2026.01.28 ", layout="wide")
 
 
-import inspect
 import streamlit as st
+import streamlit_authenticator as stauth
+import inspect
 
-# ===== Login：只呼叫一次，避免 duplicate form key =====
+def secrets_to_dict(x):
+    if hasattr(x, "to_dict"):
+        return secrets_to_dict(x.to_dict())
+    if isinstance(x, dict):
+        return {k: secrets_to_dict(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [secrets_to_dict(v) for v in x]
+    return x
+
+# ===== 1) 先把 secrets 轉成一般 dict =====
+auth_config = secrets_to_dict(st.secrets["auth"])
+
+# ===== 2) 先建立 authenticator（這行一定要在 safe_login 前面）=====
+authenticator = stauth.Authenticate(
+    auth_config["credentials"],
+    auth_config["cookie_name"],
+    auth_config["cookie_key"],
+    auth_config["cookie_expiry_days"],
+)
+
+# ===== 3) 再登入（只呼叫一次，避免 duplicate form）=====
 def safe_login(authenticator):
     fn = authenticator.login
     sig = inspect.signature(fn)
     params = sig.parameters
 
-    # 只呼叫一次：依參數名稱決定用哪種呼叫
+    # 有些版本是 login(form_name, location=...)
     if "location" in params:
-        # 這類版本通常是 login(form_name, location=...)
         return fn("登入系統", location="main")
 
-    # 沒有 location 參數 → 用位置參數呼叫（你目前版本就是這類）
-    # 依你前面的錯誤訊息：「Location must be one of...」代表它吃到 location 這個值
-    # 所以它的簽名很可能是 login(location, form_name, ...)
+    # 你目前雲端錯誤訊息看起來是 login(location, form_name)
     return fn("main", "登入系統")
 
 login_ret = safe_login(authenticator)
 
-# 兼容回傳
-name, authentication_status, username = ("", None, "")
-if isinstance(login_ret, tuple):
-    if len(login_ret) == 3:
-        name, authentication_status, username = login_ret
-    elif len(login_ret) == 2:
-        name, authentication_status = login_ret
-elif isinstance(login_ret, dict):
-    name = login_ret.get("name", "") or ""
-    username = login_ret.get("username", "") or ""
-    authentication_status = login_ret.get("authentication_status", None)
-
-# 以 session_state 為準（很多版本只寫這裡）
-authentication_status = st.session_state.get("authentication_status", authentication_status)
-name = st.session_state.get("name", name)
-username = st.session_state.get("username", username)
+# ===== 4) 讀取結果（以 session_state 為主）=====
+authentication_status = st.session_state.get("authentication_status", None)
+name = st.session_state.get("name", "")
+username = st.session_state.get("username", "")
 
 if authentication_status is True:
     with st.sidebar:
@@ -85,6 +91,7 @@ elif authentication_status is False:
 else:
     st.warning("請先登入")
     st.stop()
+
 
 
 
