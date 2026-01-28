@@ -32,6 +32,34 @@ except Exception:
 
 # ---- Page ----
 st.set_page_config(page_title="fricachai 論文統計分析專業版(release 1.0) 2026.01.28 ", layout="wide")
+
+import streamlit as st
+import streamlit_authenticator as stauth
+
+# ===== Authentication =====
+auth_config = st.secrets["auth"]
+
+authenticator = stauth.Authenticate(
+    credentials=auth_config["credentials"],
+    cookie_name=auth_config["cookie_name"],
+    cookie_key=auth_config["cookie_key"],
+    cookie_expiry_days=auth_config["cookie_expiry_days"],
+)
+
+name, authentication_status, username = authenticator.login("登入系統", "main")
+
+if authentication_status is False:
+    st.error("帳號或密碼錯誤")
+    st.stop()
+
+elif authentication_status is None:
+    st.warning("請先登入")
+    st.stop()
+
+# authentication_status == True 才會走到這裡
+st.success(f"歡迎 {name}")
+
+
 st.title("📊 fricachai 論文統計分析專業版(release 1.0) 2026.01.28")
 
 
