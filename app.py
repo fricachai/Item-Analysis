@@ -1441,7 +1441,7 @@ elif iv_m and med_m and dv_m:
     st.dataframe(df_mediation, width="stretch")
 
     st.download_button(
-        "下載 中介分析研究用資料 CSV（IV + M + DV）",
+        "下載 中介分析研究用資料 CSV（IV + Me + DV）",
         data=df_to_csv_bytes(df_mediation),
         file_name=f"mediation_dataset_{iv_m}_{med_m}_{dv_m}.csv",
         mime="text/csv",
