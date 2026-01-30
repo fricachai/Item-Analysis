@@ -1487,7 +1487,7 @@ st.subheader("🧩 干擾分析設定")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    iv_w = st.selectbox("① 自變數（IV）", options=[""] + dim_cols, index=0, key="mod_iv")
+    iv_w = st.selectbox("① 自變數(IV)", options=[""] + dim_cols, index=0, key="mod_iv")
 
 mod_options = [""] + [c for c in dim_cols if c != iv_w]
 with col2:
@@ -1495,7 +1495,7 @@ with col2:
 
 dv_options2 = [""] + [c for c in dim_cols if c not in {iv_w, w_var}]
 with col3:
-    dv_w = st.selectbox("③ 依變數（DV）", options=dv_options2, index=0, key="mod_dv")
+    dv_w = st.selectbox("③ 依變數(DV)", options=dv_options2, index=0, key="mod_dv")
 
 chosen2 = [x for x in [iv_w, w_var, dv_w] if x]
 if len(chosen2) != len(set(chosen2)):
