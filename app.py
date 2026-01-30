@@ -1436,7 +1436,7 @@ if len(chosen) != len(set(chosen)):
 elif iv_m and med_m and dv_m:
     st.success(f"中介模型：{iv_m} → {med_m} → {dv_m}")
 
-    st.markdown("### 研究用資料表（僅保留 IV / M / DV）")
+    st.markdown("### 研究用資料表（僅保留 IV / Me / DV）")
     df_mediation = df_raw_plus_dimmeans[[iv_m, med_m, dv_m]].copy()
     st.dataframe(df_mediation, width="stretch")
 
