@@ -418,78 +418,98 @@ def build_mediation_paper_table(df: pd.DataFrame, iv: str, med: str, dv: str):
     if d.empty:
         raise ValueError("可用資料為空（IV/M/DV 可能有空值或非數值）。")
 
+    # 條件二：IV -> Med
     y2 = d[med].astype(float)
     X2 = d[[iv]].astype(float)
     m2 = _fit_ols(y2, X2)
     beta2 = _std_beta(m2.params, X2, y2)
 
+    # 條件一：IV -> DV
     y1 = d[dv].astype(float)
     X1 = d[[iv]].astype(float)
     m1 = _fit_ols(y1, X1)
     beta1 = _std_beta(m1.params, X1, y1)
 
+    # 條件三：IV + Med -> DV
     y3 = d[dv].astype(float)
     X3 = d[[iv, med]].astype(float)
     m3 = _fit_ols(y3, X3)
     beta3 = _std_beta(m3.params, X3, y3)
 
-    col_c2_beta = f"{med}（條件二）β值"
-    col_c2_t = f"{med}（條件二）t值"
-    col_c1_beta = f"{dv}（條件一）β值"
-    col_c1_t = f"{dv}（條件一）t值"
-    col_c3_beta = f"{dv}（條件三）β值"
-    col_c3_t = f"{dv}（條件三）t值"
+    # 欄位名稱對齊論文截圖
+    col_c2_beta = f"{med} 條件（二） β"
+    col_c2_p = f"{med} 條件（二） 顯著性"
+    col_c1_beta = f"{dv} 條件（一） β"
+    col_c1_p = f"{dv} 條件（一） 顯著性"
+    col_c3_beta = f"{dv} 條件（三） β"
+    col_c3_t = f"{dv} 條件（三） t 值"
+    col_c3_p = f"{dv} 條件（三） 顯著性"
+
+    # P值格式化小幫手：小於0.001顯示0.000，其餘顯示3位小數
+    def _fmt_p(p_val):
+        if pd.isna(p_val): return ""
+        return "0.000" if p_val < 0.001 else f"{p_val:.3f}"
 
     rows = []
+    
+    # Row 1: IV (自變數)
     rows.append({
         "自變項": iv,
-        col_c2_beta: _fmt_beta(beta2.get(iv, np.nan), float(m2.pvalues.get(iv, np.nan))),
-        col_c2_t: _fmt_t(float(m2.tvalues.get(iv, np.nan))),
-        col_c1_beta: _fmt_beta(beta1.get(iv, np.nan), float(m1.pvalues.get(iv, np.nan))),
-        col_c1_t: _fmt_t(float(m1.tvalues.get(iv, np.nan))),
-        col_c3_beta: _fmt_beta(beta3.get(iv, np.nan), float(m3.pvalues.get(iv, np.nan))),
-        col_c3_t: _fmt_t(float(m3.tvalues.get(iv, np.nan))),
+        col_c2_beta: f"{beta2.get(iv, np.nan):.3f}",
+        col_c2_p: _fmt_p(float(m2.pvalues.get(iv, np.nan))),
+        col_c1_beta: f"{beta1.get(iv, np.nan):.3f}",
+        col_c1_p: _fmt_p(float(m1.pvalues.get(iv, np.nan))),
+        col_c3_beta: f"{beta3.get(iv, np.nan):.3f}",
+        col_c3_t: f"{float(m3.tvalues.get(iv, np.nan)):.3f}",
+        col_c3_p: _fmt_p(float(m3.pvalues.get(iv, np.nan))),
     })
 
+    # Row 2: Mediator (中介變數)
     rows.append({
         "自變項": med,
-        col_c2_beta: "", col_c2_t: "", col_c1_beta: "", col_c1_t: "",
-        col_c3_beta: _fmt_beta(beta3.get(med, np.nan), float(m3.pvalues.get(med, np.nan))),
-        col_c3_t: _fmt_t(float(m3.tvalues.get(med, np.nan))),
+        col_c2_beta: "", col_c2_p: "",
+        col_c1_beta: "", col_c1_p: "",
+        col_c3_beta: f"{beta3.get(med, np.nan):.3f}",
+        col_c3_t: f"{float(m3.tvalues.get(med, np.nan)):.2f}", # 依截圖格式顯示兩位數 10.87
+        col_c3_p: _fmt_p(float(m3.pvalues.get(med, np.nan))),
     })
 
+    # Row 3: R²
     rows.append({
         "自變項": "R²",
-        col_c2_beta: f"{float(m2.rsquared):.4f}", col_c2_t: "",
-        col_c1_beta: f"{float(m1.rsquared):.4f}", col_c1_t: "",
-        col_c3_beta: f"{float(m3.rsquared):.4f}", col_c3_t: "",
+        col_c2_beta: f"{float(m2.rsquared):.3f}", col_c2_p: "",
+        col_c1_beta: f"{float(m1.rsquared):.3f}", col_c1_p: "",
+        col_c3_beta: f"{float(m3.rsquared):.3f}", col_c3_t: "", col_c3_p: "",
     })
 
+    # Row 4: ΔR² (修正計算邏輯為 R² 的改變量)
+    dr2_3 = float(m3.rsquared) - float(m1.rsquared)
     rows.append({
         "自變項": "ΔR²",
-        col_c2_beta: f"{float(m2.rsquared_adj):.4f}", col_c2_t: "",
-        col_c1_beta: f"{float(m1.rsquared_adj):.4f}", col_c1_t: "",
-        col_c3_beta: f"{float(m3.rsquared_adj):.4f}", col_c3_t: "",
+        col_c2_beta: f"{float(m2.rsquared):.3f}", col_c2_p: "",
+        col_c1_beta: f"{float(m1.rsquared):.3f}", col_c1_p: "",
+        col_c3_beta: f"{dr2_3:.3f}", col_c3_t: "", col_c3_p: "",
     })
 
+    # Row 5: F (小數點後 1 位 + 顯著星號)
     rows.append({
         "自變項": "F",
-        col_c2_beta: f"{float(m2.fvalue):.4f}{_sig_stars(float(m2.f_pvalue))}", col_c2_t: "",
-        col_c1_beta: f"{float(m1.fvalue):.4f}{_sig_stars(float(m1.f_pvalue))}", col_c1_t: "",
-        col_c3_beta: f"{float(m3.fvalue):.4f}{_sig_stars(float(m3.f_pvalue))}", col_c3_t: "",
+        col_c2_beta: f"{float(m2.fvalue):.1f}{_sig_stars(float(m2.f_pvalue))}", col_c2_p: "",
+        col_c1_beta: f"{float(m1.fvalue):.1f}{_sig_stars(float(m1.f_pvalue))}", col_c1_p: "",
+        col_c3_beta: f"{float(m3.fvalue):.1f}{_sig_stars(float(m3.f_pvalue))}", col_c3_t: "", col_c3_p: "",
     })
 
+    # Row 6: D-W
     rows.append({
         "自變項": "D-W",
-        col_c2_beta: f"{float(durbin_watson(m2.resid)):.4f}", col_c2_t: "",
-        col_c1_beta: f"{float(durbin_watson(m1.resid)):.4f}", col_c1_t: "",
-        col_c3_beta: f"{float(durbin_watson(m3.resid)):.4f}", col_c3_t: "",
+        col_c2_beta: f"{float(durbin_watson(m2.resid)):.3f}", col_c2_p: "",
+        col_c1_beta: f"{float(durbin_watson(m1.resid)):.3f}", col_c1_p: "",
+        col_c3_beta: f"{float(durbin_watson(m3.resid)):.3f}", col_c3_t: "", col_c3_p: "",
     })
 
     table_df = pd.DataFrame(rows)
     meta = {"N": int(m3.nobs), "cond1": m1, "cond2": m2, "cond3": m3}
     return table_df, meta
-
 
 def build_moderation_paper_table(df: pd.DataFrame, iv: str, mod: str, dv: str):
     d = df[[iv, mod, dv]].apply(pd.to_numeric, errors="coerce").dropna(axis=0, how="any")
