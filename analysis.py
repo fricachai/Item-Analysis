@@ -60,29 +60,34 @@ def calculate_cronbach_alpha(df: pd.DataFrame):
 
 def _subdim_code(item_code: str) -> str:
     """
-    子構面代碼邏輯優化：
-    - 若為 A11 -> A1 (字母+第一碼數字)
-    - 若為 D1, E4 -> D, E (無子構面，直接回傳字母)
+    子構面代碼自動判斷規則：
+    - A11、A12、A13 → A1
+    - A21、A22、A23 → A2
+    - D1、D2、D3 → D1、D2、D3
+    - D11、D12 → D1
+    - E21、E22 → E2
+    - F11、F12 → F1
+    - 適用 A～Z，不再將 D、E 固定合併
     """
-    s = str(item_code).strip()
-    m = re.match(r"^([A-Za-z])(\d+)(?:_(\d+))?$", s)
-    if m:
-        letter = m.group(1).upper()
-        digits = m.group(2)
-        
-        # 若數字只有 1 碼 (如 D1)，或明確屬於無子構面的 D, E，直接回傳字母
-        if len(digits) == 1 or letter in ['D', 'E']:
-            return letter
-        else:
-            return letter + digits[0]
-            
-    # 保底機制
-    return s[:2].upper() if len(s) >= 2 else s.upper()
+    s = str(item_code).strip().upper()
+    m = re.match(r"^([A-Z])(\d+)(?:_(\d+))?$", s)
+    if not m:
+        return s
+
+    letter = m.group(1)
+    digits = m.group(2)
+
+    # 單碼題號：D1、E2、F3 → 直接視為 D1、E2、F3
+    if len(digits) == 1:
+        return f"{letter}{digits}"
+
+    # 多碼題號：A11、A12、A21、D11、E21 → 取第一碼作為子構面
+    return f"{letter}{digits[0]}"
 
 
 def run_item_analysis(df_norm: pd.DataFrame):
     """
-    核心修正：執行項目分析並對齊 JASP 獨立樣本 t 檢定邏輯
+    執行項目分析、子構面信度、CITC、因素負荷量與 CR 檢定
     """
     # 識別題項欄位放寬為 \d{1,3}
     ITEM_CODE_RE = re.compile(r"^[A-Za-z]\d{1,3}(_\d+)?$")
@@ -136,7 +141,7 @@ def run_item_analysis(df_norm: pd.DataFrame):
             cr_value, cr_p = np.nan, np.nan
 
         # 2. CITC 與 Alpha (以「子構面」為範圍)
-        sub_cols = [c for c in item_cols if c.startswith(sub_dim)]
+        sub_cols = [c for c in item_cols if _subdim_code(c) == sub_dim]
         if len(sub_cols) > 1:
             sub_sum = df_items[sub_cols].sum(axis=1)
             corrected_sum = sub_sum - col_data.fillna(0)

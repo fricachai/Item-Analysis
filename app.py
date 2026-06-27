@@ -1,4 +1,3 @@
-# app.py
 # -*- coding: utf-8 -*-
 import io
 import os
@@ -601,28 +600,53 @@ def build_moderation_paper_table(df: pd.DataFrame, iv: str, mod: str, dv: str):
     return table_df, meta
 
 
+def _subdim_sort_key(x: str):
+    """
+    子構面排序：A1, A2, A3, B1...D1, D2...E1...
+    """
+    s = str(x).strip().upper()
+    m = re.match(r"^([A-Z])(\d+)$", s)
+    if m:
+        return (m.group(1), int(m.group(2)))
+    m2 = re.match(r"^([A-Z])$", s)
+    if m2:
+        return (m2.group(1), 0)
+    return (s, 10**9)
+
+
 def build_discriminant_validity_table(df_norm: pd.DataFrame, item_df: pd.DataFrame):
-    import re
     from scipy.stats import pearsonr
+
+    if item_df.empty or "子構面" not in item_df.columns or "該子構面整體 α" not in item_df.columns:
+        return pd.DataFrame()
+
+    item_cols = _find_item_cols(df_norm)
+    if not item_cols:
+        return pd.DataFrame()
 
     sub_alpha = (
         item_df.groupby("子構面")["該子構面整體 α"]
         .first()
-        .dropna()
         .to_dict()
     )
 
-    sub_dims = sorted(sub_alpha.keys())
+    sub_dims = sorted(sub_alpha.keys(), key=_subdim_sort_key)
     sub_scores = {}
 
     for sd in sub_dims:
-        cols = [c for c in df_norm.columns if isinstance(c, str) and re.match(rf"^{sd}\d+", c)]
+        # 核心修正：不能用 startswith 或 ^D1\d+，否則 D1 單碼題項會抓不到。
+        # 必須使用與 Item Analysis 完全一致的 _subdim_code() 判斷。
+        cols = [c for c in item_cols if _subdim_code(c) == sd]
         if cols:
             sub_scores[sd] = (
                 df_norm[cols]
                 .apply(pd.to_numeric, errors="coerce")
-                .mean(axis=1)
+                .mean(axis=1, skipna=True)
             )
+
+    sub_dims = [sd for sd in sub_dims if sd in sub_scores]
+    if not sub_dims:
+        return pd.DataFrame()
 
     score_df = pd.DataFrame(sub_scores)
     mat = pd.DataFrame("", index=sub_dims, columns=sub_dims)
@@ -630,13 +654,17 @@ def build_discriminant_validity_table(df_norm: pd.DataFrame, item_df: pd.DataFra
     for i, r in enumerate(sub_dims):
         for j, c in enumerate(sub_dims):
             if i == j:
+                alpha_val = sub_alpha.get(r, "")
                 try:
-                    mat.loc[r, c] = f"{float(sub_alpha[r]):.4f}"
+                    if pd.isna(alpha_val):
+                        mat.loc[r, c] = "—"
+                    else:
+                        mat.loc[r, c] = f"{float(alpha_val):.4f}"
                 except Exception:
-                    mat.loc[r, c] = str(sub_alpha[r])
+                    mat.loc[r, c] = str(alpha_val) if str(alpha_val).strip() else "—"
             elif i > j:
                 valid_pair = score_df[[r, c]].dropna()
-                
+
                 if len(valid_pair) > 2:
                     r_val, p_val = pearsonr(valid_pair[r], valid_pair[c])
                     star = "**" if p_val < 0.01 else ""
@@ -654,23 +682,29 @@ def build_discriminant_validity_table(df_norm: pd.DataFrame, item_df: pd.DataFra
 # =========================================================================
 def _subdim_code(item_code: str) -> str:
     """
-    子構面代碼邏輯：
-    - 若為 A11 -> A1 (字母+第一碼數字)
-    - 若為 D1, E4 -> D, E (無子構面，直接回傳字母)
+    子構面代碼自動判斷規則：
+    - A11、A12、A13 → A1
+    - A21、A22、A23 → A2
+    - D1、D2、D3 → D1、D2、D3
+    - D11、D12 → D1
+    - E21、E22 → E2
+    - F11、F12 → F1
+    - 適用 A～Z，不再將 D、E 固定合併
     """
-    s = str(item_code).strip()
-    m = re.match(r"^([A-Za-z])(\d+)(?:_(\d+))?$", s)
-    if m:
-        letter = m.group(1).upper()
-        digits = m.group(2)
-        # 若數字只有 1 碼，或者明確屬於無子構面的 D, E，直接回傳字母
-        if len(digits) == 1 or letter in ['D', 'E']:
-            return letter
-        else:
-            return letter + digits[0]
-            
-    # 保底機制
-    return s[:2].upper() if len(s) >= 2 else s.upper()
+    s = str(item_code).strip().upper()
+    m = re.match(r"^([A-Z])(\d+)(?:_(\d+))?$", s)
+    if not m:
+        return s
+
+    letter = m.group(1)
+    digits = m.group(2)
+
+    # 單碼題號：D1、E2、F3 → 直接視為 D1、E2、F3
+    if len(digits) == 1:
+        return f"{letter}{digits}"
+
+    # 多碼題號：A11、A12、A21、D11、E21 → 取第一碼作為子構面
+    return f"{letter}{digits[0]}"
 
 
 def _item_sort_key(code: str):
@@ -1071,7 +1105,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("子構面規則（你指定）")
-    st.write("子構面只取題項代碼的**前兩碼**：例如 A01→A0、A11→A1、A105→A1。若為 D, E 則獨立計算。")
+    st.write("子構面依題項代碼自動判斷：A11→A1、A21→A2、D1→D1、D11→D1、E21→E2；適用 A～Z，不再將 D、E 固定合併。")
 
 
 # ---- Main ----
